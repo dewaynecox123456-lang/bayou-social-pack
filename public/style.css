@@ -24,7 +24,8 @@ body{
   padding:14px 16px;border:1px solid var(--line);border-radius:16px;background:rgba(11,35,39,.65);
   backdrop-filter: blur(6px);
 }
-.brand{display:flex;align-items:center;gap:12px}
+.brand{display:flex;align-items:center;gap:14px}
+.brand-img{width:44px;height:44px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.35));}
 .logoMark{
   width:38px;height:38px;border-radius:12px;
   background:linear-gradient(135deg, rgba(126,224,199,.95), rgba(21,183,158,.55));
@@ -86,4 +87,11 @@ button:hover{filter:brightness(1.05)}
 /* Remove decorative logo square now that real logo is present */
 .logoMark {
   display: none !important;
+}
+
+.trust{
+  margin-top:10px;
+  color:rgba(233,243,242,.70);
+  font-size:12px;
+  text-align:center;
 }
