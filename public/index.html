@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Bayou Social Pack</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div class="brand">
+        <div class="logoMark" aria-hidden="true"></div>
+        <div>
+          <h1>Bayou Social Pack</h1>
+          <div class="sub">One upload → post-ready assets for Facebook, Instagram, Pinterest, and YouTube.</div>
+        </div>
+      </div>
+      <div class="badge">BayouFinds • Creator Tools</div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Generate a ZIP</h2>
+        <p class="help">Upload one image + your logo. We output platform-correct sizes with your branding applied.</p>
+
+        <form id="f">
+          <label>Image (JPG/PNG)</label>
+          <input type="file" name="image" accept="image/*" required />
+
+          <label>Logo (PNG recommended)</label>
+          <input type="file" name="logo" accept="image/*" required />
+
+          <div class="row2">
+            <div>
+              <label>Logo position</label>
+              <select name="position">
+                <option value="bottom-right" selected>Bottom right</option>
+                <option value="bottom-left">Bottom left</option>
+                <option value="top-right">Top right</option>
+                <option value="top-left">Top left</option>
+              </select>
+            </div>
+            <div>
+              <label>Logo size</label>
+              <select name="size">
+                <option value="small" selected>Small</option>
+                <option value="medium">Medium</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row2">
+            <div>
+              <label>Logo opacity (0.1 to 1.0)</label>
+              <input type="number" step="0.05" min="0.1" max="1.0" name="opacity" value="0.85" />
+            </div>
+            <div>
+              <label>Margin (px)</label>
+              <input type="number" min="0" max="120" name="margin" value="24" />
+            </div>
+          </div>
+
+          <button type="submit">Generate ZIP</button>
+        </form>
+
+        <div id="status" class="status"></div>
+      </div>
+
+      <div class="card">
+        <h2>What you get</h2>
+        <p class="help">Exported as high-quality JPGs. Ready to upload with no resizing or guessing.</p>
+
+        <div class="kv">
+          <div class="pill"><b>Facebook</b><span>1200×630 + 1080×1080</span></div>
+          <div class="pill"><b>Instagram</b><span>1080×1080 + Story 1080×1920</span></div>
+          <div class="pill"><b>Pinterest</b><span>1000×1500</span></div>
+          <div class="pill"><b>YouTube</b><span>Thumbnail 1280×720</span></div>
+        </div>
+
+        <div class="footer">
+          Powered by BayouFinds • <a href="https://bayoufinds.com" target="_blank" rel="noreferrer">bayoufinds.com</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const f = document.getElementById('f');
+    const status = document.getElementById('status');
+
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      status.textContent = "Generating…";
+
+      const fd = new FormData(f);
+      const r = await fetch('/api/generate', { method: 'POST', body: fd });
+
+      if (!r.ok) {
+        const t = await r.text();
+        status.textContent = "Error: " + t;
+        return;
+      }
+
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'social_pack.zip';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      status.textContent = "Done. ZIP downloaded.";
+    });
+  </script>
+</body>
+</html>
