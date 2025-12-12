@@ -1,0 +1,43 @@
+/* Bayou Social Pack - Blue SaaS Theme Override */
+
+:root{
+  --bg:#0b1220;               /* deep navy */
+  --card:#0f172a;             /* slate blue */
+  --card2:#111c34;
+  --text:#e8edf7;
+  --muted:#a9b4d6;
+  --line:rgba(255,255,255,.08);
+
+  --accent:#60a5fa;           /* sky blue */
+  --btn:#3b82f6;              /* blue-500 */
+  --btn2:#2563eb;             /* blue-600 */
+}
+
+/* Generic overrides (safe even if classnames differ) */
+html, body { background: var(--bg) !important; color: var(--text) !important; }
+a { color: var(--accent) !important; }
+
+button, .btn, .primary, .primary-btn {
+  background: var(--btn) !important;
+  color: #fff !important;
+  border: 1px solid var(--line) !important;
+}
+button:hover, .btn:hover, .primary:hover, .primary-btn:hover {
+  background: var(--btn2) !important;
+}
+
+.card, .panel, .box {
+  background: var(--card) !important;
+  border: 1px solid var(--line) !important;
+}
+
+input, select, textarea {
+  background: rgba(255,255,255,.04) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--line) !important;
+}
+
+/* BayouFinds header logo */
+.brand{display:flex;align-items:center;gap:14px}
+.brand-img{height:46px;width:auto;display:block}
+.sub{color:var(--muted);font-size:13px;margin-top:4px}
