@@ -10,6 +10,15 @@ import crypto from "crypto";
 const app = express();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
+// ---- Image normalization (makes "weird" PNG/JPG uploads work reliably) ----
+async function normalizeImage(buffer) {
+  return sharp(buffer, { failOnError: false })
+    .rotate()
+    .toColorspace("srgb")
+    .png({ force: true, compressionLevel: 9, adaptiveFiltering: true })
+    .toBuffer();
+}
+
 app.use(express.static("public"));
 
 const FORMATS = [
@@ -51,6 +60,10 @@ app.post(
       if (!imageFile) return res.status(400).send("Missing image upload.");
       if (!logoFile) return res.status(400).send("Missing logo upload.");
 
+      // Normalize uploads so Sharp can handle odd/dirty PNG/JPG files
+      let imageBuf = await normalizeImage(imageFile.buffer);
+      let logoBuf  = await normalizeImage(logoFile.buffer);
+
       const position = String(req.body.position || "bottom-right");
       const sizePreset = String(req.body.size || "small"); // small | medium
       const opacity = clamp(parseFloat(req.body.opacity ?? "0.85"), 0.1, 1.0);
@@ -61,17 +74,17 @@ app.post(
       fs.mkdirSync(outDir, { recursive: true });
 
       // Preload logo once
-      const logoInput = sharp(logoFile.buffer).ensureAlpha();
+      const logoInput = sharp(logoBuf, { failOnError: false }).ensureAlpha();
       const logoMeta = await logoInput.metadata();
       if (!logoMeta.width || !logoMeta.height) throw new Error("Logo image could not be read.");
 
       for (const f of FORMATS) {
         // Resize base with cover (crop) to exact aspect ratio
-        const base = sharp(imageFile.buffer).resize(f.w, f.h, { fit: "cover", position: "centre" });
+        const base = sharp(imageBuf, { failOnError: false }).resize(f.w, f.h, { fit: "cover", position: "center" });
 
         // Compute logo size within constraints
         const { maxW, maxH } = computeLogoBox(f.w, f.h, sizePreset);
-        const logoResized = sharp(logoFile.buffer)
+        const logoResized = sharp(logoBuf, { failOnError: false })
           .ensureAlpha()
           .resize({ width: maxW, height: maxH, fit: "inside" });
 
