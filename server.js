@@ -282,3 +282,6 @@ app.post(
 app.listen(PORT, () => {
   console.log(`Bayou Social Pack running -> http://localhost:${PORT}`);
 });
+
+// Compatibility alias: some clients may request /app.js
+app.get("/app.js", (req, res) => res.sendFile(path.join(__dirname, "public", "app.js")));
