@@ -26,11 +26,11 @@
 
         <form id="frm">
           <label>Image (PNG/JPG)
-            <input type="file" name="image" accept="image/png,image/jpeg" required />
+            <input id="imageInput" type="file" name="image" accept="image/png,image/jpeg" required />
           </label>
 
           <label>Logo (PNG recommended)
-            <input type="file" name="logo" accept="image/png" required />
+            <input id="logoInput" type="file" name="logo" accept="image/png" required />
           </label>
 
           <div class="row">
@@ -80,8 +80,21 @@
       <section class="card">
         <h2>Preview</h2>
         <p class="muted">Facebook feed preview (1200×630). No zip download needed.</p>
-        <div class="previewBox">
-          <img id="previewImg" alt="Preview will appear here" />
+
+        <div class="previewBox" id="previewBox" data-state="idle">
+          <div class="previewPlaceholder" id="previewPlaceholder">
+            <img
+              class="previewLogo"
+              src="/assets/overlays/bayoufinds-signature.svg"
+              alt="BayouFinds signature"
+              onerror="this.style.display='none'"
+            />
+            <div class="previewTitle" id="previewTitle">Preview will appear here</div>
+            <div class="previewHint" id="previewHint">Drop an image + logo, then click Preview.</div>
+            <div class="spinner" id="spinner" aria-hidden="true"></div>
+          </div>
+
+          <img id="previewImg" alt="Facebook feed preview (1200×630)" />
         </div>
       </section>
     </main>
