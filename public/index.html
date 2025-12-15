@@ -4,117 +4,93 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Bayou Social Pack</title>
-  <link rel="stylesheet" href="/style.css" />
-  <link rel="stylesheet" href="/theme.css" />
+  <link rel="stylesheet" href="/public/style.css" />
 </head>
 <body>
   <div class="wrap">
-    <div class="top">
+    <header class="hero">
       <div class="brand">
-        <div class="logoMark" aria-hidden="true"></div>
-        <div>
-          <div class="brand"><img class="brand-img" src="/assets/bayoufinds-logo.png" alt="BayouFinds" /><div><h1>Bayou Social Pack</h1><div class="sub">One upload → post-ready assets for Facebook, Instagram, Pinterest, and YouTube.</div></div></div>
-          <div class="sub">One upload → post-ready assets for Facebook, Instagram, Pinterest, and YouTube.</div>
+        <div class="mark">
+          <span class="pelican">🦢</span>
+          <span class="name">Bayou Social Pack</span>
         </div>
+        <div class="sub">One upload → post-ready assets (Facebook-first).</div>
       </div>
-      <div class="badge">BayouFinds • Creator Tools</div>
-    </div>
+      <div class="pill">BayouFinds • Creator Tools</div>
+    </header>
 
-    <div class="grid">
-      <div class="card">
+    <main class="grid">
+      <section class="card">
         <h2>Generate a ZIP</h2>
-        <p class="help">Upload one image + your logo. We output platform-correct sizes with your branding applied.</p>
+        <p class="muted">Upload one image + your logo. Preview is Facebook 1200×630.</p>
 
-        <form id="f">
-          <label>Image (JPG/PNG)</label>
-          <input type="file" name="image" accept="image/*" required />
+        <form id="frm">
+          <label>Image (PNG/JPG)
+            <input type="file" name="image" accept="image/png,image/jpeg" required />
+          </label>
 
-          <label>Logo (PNG recommended)</label>
-          <input type="file" name="logo" accept="image/*" required />
+          <label>Logo (PNG recommended)
+            <input type="file" name="logo" accept="image/png" required />
+          </label>
 
-          <div class="row2">
-            <div>
-              <label>Logo position</label>
+          <div class="row">
+            <label>Logo position
               <select name="position">
-                <option value="bottom-right" selected>Bottom right</option>
+                <option value="bottom-right" selected>Bottom right (default)</option>
                 <option value="bottom-left">Bottom left</option>
                 <option value="top-right">Top right</option>
                 <option value="top-left">Top left</option>
+                <option value="bottom-center">Bottom center</option>
+                <option value="top-center">Top center</option>
+                <option value="center">Center</option>
               </select>
-            </div>
-            <div>
-              <label>Logo size</label>
+            </label>
+
+            <label>Logo size
               <select name="size">
                 <option value="small" selected>Small</option>
                 <option value="medium">Medium</option>
+                <option value="large">Large</option>
               </select>
-            </div>
+            </label>
           </div>
 
-          <div class="row2">
-            <div>
-              <label>Logo opacity (0.1 to 1.0)</label>
-              <input type="number" step="0.05" min="0.1" max="1.0" name="opacity" value="0.85" />
-            </div>
-            <div>
-              <label>Margin (px)</label>
-              <input type="number" min="0" max="120" name="margin" value="24" />
-            </div>
+          <div class="row">
+            <label>Opacity (0.1–1.0)
+              <input type="number" name="opacity" step="0.05" min="0.1" max="1.0" value="0.85" />
+            </label>
+            <label>Margin (px)
+              <input type="number" name="margin" min="0" max="200" value="24" />
+            </label>
           </div>
 
-          <button type="submit">Generate ZIP</button>
+          <div class="hint">
+            Tip: For “signature at bottom” vibes, use bottom-right + small + 0.80–0.90 opacity.
+          </div>
+
+          <div class="btnrow">
+            <button type="button" id="btnPreview">Preview (Facebook)</button>
+            <button type="submit" id="btnZip">Generate ZIP</button>
+          </div>
+
+          <div id="status" class="status">Ready.</div>
         </form>
+      </section>
 
-        <div id="status" class="status"></div>
-      </div>
-
-      <div class="card">
-        <h2>What you get</h2>
-        <p class="help">Exported as high-quality JPGs. Ready to upload with no resizing or guessing.</p>
-
-        <div class="kv">
-          <div class="pill"><b>Facebook</b><span>1200×630 + 1080×1080</span></div>
-          <div class="pill"><b>Instagram</b><span>1080×1080 + Story 1080×1920</span></div>
-          <div class="pill"><b>Pinterest</b><span>1000×1500</span></div>
-          <div class="pill"><b>YouTube</b><span>Thumbnail 1280×720</span></div>
+      <section class="card">
+        <h2>Preview</h2>
+        <p class="muted">Facebook feed preview (1200×630). No zip download needed.</p>
+        <div class="previewBox">
+          <img id="previewImg" alt="Preview will appear here" />
         </div>
+      </section>
+    </main>
 
-        <div class="footer">
-          Powered by BayouFinds • <a href="https://bayoufinds.com" target="_blank" rel="noreferrer">bayoufinds.com</a>
-        </div>
-      </div>
-    </div>
+    <footer class="foot">
+      Powered by BayouFinds • <span class="muted">Phase 1 shipping build</span>
+    </footer>
   </div>
 
-  <script>
-    const f = document.getElementById('f');
-    const status = document.getElementById('status');
-
-    f.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      status.textContent = "Generating…";
-
-      const fd = new FormData(f);
-      const r = await fetch('/api/generate', { method: 'POST', body: fd });
-
-      if (!r.ok) {
-        const t = await r.text();
-        status.textContent = "Error: " + t;
-        return;
-      }
-
-      const blob = await r.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'social_pack.zip';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-
-      status.textContent = "Done. ZIP downloaded.";
-    });
-  </script>
+  <script src="/public/app.js"></script>
 </body>
 </html>
