@@ -6,10 +6,15 @@ import archiver from "archiver";
 import path from "path";
 import { fileURLToPath } from "url";
 
+import fs from "fs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
 const app = express();
+
+// Serve static frontend (public/)
+app.use(express.static(path.join(__dirname, "public")));
+
 app.use(cors());
 
 // -------- Config --------
@@ -25,12 +30,33 @@ const SIZES = {
   youtube_thumb: { w: 1280, h: 720 },
 };
 
-const DEFAULTS = {
-  position: "bottom-right",
-  size: "small",       // small | medium | large
-  opacity: 0.85,       // 0.1 - 1.0
-  margin: 24,
+// ------------------------------------------------------
+// Output Profiles (Social vs Print/Puzzle)
+// ------------------------------------------------------
+const PRINT_SIZES = {
+  // 8.38" x 11.89" @ 300 DPI (print-ready)
+  puzzle_8p38x11p89_300dpi: { w: 2514, h: 3567 },
 };
+
+const PROFILES = {
+  social: [
+    ["facebook_1200x630.jpg",         SIZES.facebook_feed],
+    ["facebook_1080x1080.jpg",        SIZES.facebook_square],
+    ["instagram_1080x1080.jpg",       SIZES.instagram_square],
+    ["instagram_story_1080x1920.jpg", SIZES.instagram_story],
+    ["pinterest_1000x1500.jpg",       SIZES.pinterest],
+    ["youtube_1280x720.jpg",          SIZES.youtube_thumb],
+  ],
+  puzzle: [
+    ["puzzle_2514x3567.jpg", PRINT_SIZES.puzzle_8p38x11p89_300dpi],
+  ],
+};
+
+function getProfileKey(reqBody) {
+  const k = String(reqBody.profile || reqBody.output_profile || "social").trim().toLowerCase();
+  return PROFILES[k] ? k : "social";
+}
+
 
 // -------- License Gate (Phase 1 simple) --------
 // Dev bypass: BSP_DEV_BYPASS=1
@@ -55,6 +81,60 @@ const upload = multer({
 });
 
 // -------- Helpers --------
+// 1x1 transparent PNG (fallback when no logo is uploaded)
+const EMPTY_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/6VYk7sAAAAASUVORK5CYII=",
+  "base64"
+);
+
+function escapeXml(s) {
+  return String(s || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+// Payhip-style: gold + soft shadow, bottom-right, two lines
+function makeGoldSignatureSvg({ w, h, text1, text2 }) {
+  const pad = 24;
+  const t1 = escapeXml(text1);
+  const t2 = escapeXml(text2);
+
+  // adaptive sizes
+  const fs1 = Math.round(Math.max(18, Math.min(30, w * 0.022)));
+  const fs2 = Math.round(Math.max(14, Math.min(22, w * 0.016)));
+
+  const y2 = h - pad;
+  const y1 = y2 - Math.round(fs2 * 1.35);
+
+  return Buffer.from(
+`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.50)"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <text x="${w - pad}" y="${y1}"
+      text-anchor="end"
+      font-family="Georgia, 'Times New Roman', serif"
+      font-size="${fs1}"
+      font-style="italic"
+      fill="#d6b25e"
+      opacity="0.98">${t1}</text>
+    <text x="${w - pad}" y="${y2}"
+      text-anchor="end"
+      font-family="Georgia, 'Times New Roman', serif"
+      font-size="${fs2}"
+      fill="#d6b25e"
+      opacity="0.95">${t2}</text>
+  </g>
+</svg>`,
+  "utf8"
+  );
+}
 function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
 
 function sizePercent(sizeKey) {
@@ -62,6 +142,43 @@ function sizePercent(sizeKey) {
   if (sizeKey === "large") return 0.34;
   if (sizeKey === "medium") return 0.26;
   return 0.18; // small
+}
+
+
+// -------- Auto-Post Pack (Automation) --------
+function buildAutoPostPack({ preset, topic, brand }) {
+  const safeTopic = (topic || "").toString().trim();
+  const p = (preset || "").toString().trim().toLowerCase() || "wallpaper";
+  const b = (brand || "BayouFinds.com").toString().trim();
+
+  const headline =
+    safeTopic ? safeTopic :
+    (p === "recipe" ? "Tonight’s comfort food is calling." :
+     p === "promo" ? "New drop — ready to post." :
+     "Daily bayou calm — take a breath.");
+
+  const fb = `${headline}\n\nBuilt with our Bayou Social Pack — one upload → post-ready assets + captions.\n\n— ${b}`;
+  const ig = `${headline}\n\n#BayouFinds #SouthernLiving #Louisiana #CozyVibes #SmallBusiness`;
+  const pin = `${headline} — cozy Southern inspiration, warm lighting, and bayou vibes.`;
+  const yt = `${headline}\n\nMade with Bayou Social Pack.`;
+
+  const captions = `FACEBOOK\n${fb}\n\nINSTAGRAM\n${ig}\n\nPINTEREST\n${pin}\n\nYOUTUBE\n${yt}\n`;
+
+  const seo = [
+    "bayou finds",
+    "louisiana",
+    "southern living style",
+    "cozy aesthetic",
+    p === "recipe" ? "recipe card" : "wallpaper",
+    p === "promo" ? "brand automation" : "daily inspiration",
+    safeTopic || "bayou vibes"
+  ].filter(Boolean).join(", ");
+
+  const alt = safeTopic
+    ? `${safeTopic}. Warm, cozy, Southern-inspired image with BayouFinds branding.`
+    : `Warm, cozy Southern-inspired image with BayouFinds branding.`;
+
+  return { captions, seo, alt };
 }
 
 function computePlacement(baseW, baseH, overlayW, overlayH, position, margin) {
@@ -188,19 +305,37 @@ app.post(
     try {
       const image = req.files?.image?.[0];
       const logo  = req.files?.logo?.[0];
-      if (!image || !logo) return res.status(400).json({ error: "Missing image or logo upload." });
+      if (!image) return res.status(400).json({ error: "Missing image upload." });
 
       const position = req.body.position || DEFAULTS.position;
-      const sizeKey  = req.body.size || DEFAULTS.size;
-      const opacity  = clamp(parseFloat(req.body.opacity ?? DEFAULTS.opacity), 0.1, 1.0);
-      const margin   = clamp(parseInt(req.body.margin ?? DEFAULTS.margin, 10), 0, 200);
+      let sizeKey  = req.body.size || DEFAULTS.size;
+      let opacity  = clamp(parseFloat(req.body.opacity ?? DEFAULTS.opacity), 0.1, 1.0);
+      let margin   = clamp(parseInt(req.body.margin ?? DEFAULTS.margin, 10), 0, 200);
+      const safeCrop = String(req.body.safe_crop || "").trim().toLowerCase() === "1" || String(req.body.safe_crop || "").trim().toLowerCase() === "on";
+      // Logo optional: fall back to transparent PNG
+      const logoBuf = (logo && logo.buffer) ? logo.buffer : EMPTY_PNG;
 
-      const { w, h } = SIZES.facebook_feed;
+      // Built-in branding signature (no QR yet)
+      let sigOff = String(req.body.signature_off || "").trim() === "1";
+      const sigText1 = (req.body.signature_text1 || "© Cheri Bayou Finds").toString().trim();
+      const sigText2 = (req.body.signature_text2 || "bayoufinds.com").toString().trim();
+
+
+      // Apply preset overrides (size/opacity/margin/signature_off)
+      ({ sizeKey, opacity, margin, sigOff } = applyPreset(req.body, { sizeKey, opacity, margin, sigOff }));
+      const profileKey = getProfileKey(req.body);
+      const first = PROFILES[profileKey][0];
+      const dim = first[1];
+      const { w, h } = dim;
+
+      const baseImageBuf = safeCrop
+        ? await sharp(image.buffer).resize(w, h, { fit: "cover", position: "centre" }).jpeg({ quality: 92 }).toBuffer()
+        : image.buffer;
 
       // Render output JPG, then convert to PNG for easy browser preview
       const jpg = await renderOne({
-        imageBuf: image.buffer,
-        logoBuf: logo.buffer,
+        imageBuf: baseImageBuf,
+        logoBuf: logoBuf,
         outW: w,
         outH: h,
         position,
@@ -230,12 +365,20 @@ app.post(
     try {
       const image = req.files?.image?.[0];
       const logo  = req.files?.logo?.[0];
-      if (!image || !logo) return res.status(400).json({ error: "Missing image or logo upload." });
+      if (!image) return res.status(400).json({ error: "Missing image upload." });
 
       const position = req.body.position || DEFAULTS.position;
-      const sizeKey  = req.body.size || DEFAULTS.size;
-      const opacity  = clamp(parseFloat(req.body.opacity ?? DEFAULTS.opacity), 0.1, 1.0);
-      const margin   = clamp(parseInt(req.body.margin ?? DEFAULTS.margin, 10), 0, 200);
+      let sizeKey  = req.body.size || DEFAULTS.size;
+      let opacity  = clamp(parseFloat(req.body.opacity ?? DEFAULTS.opacity), 0.1, 1.0);
+      let margin   = clamp(parseInt(req.body.margin ?? DEFAULTS.margin, 10), 0, 200);
+      const safeCrop = String(req.body.safe_crop || "").trim().toLowerCase() === "1" || String(req.body.safe_crop || "").trim().toLowerCase() === "on";
+      // Logo optional: fall back to transparent PNG
+      const logoBuf = (logo && logo.buffer) ? logo.buffer : EMPTY_PNG;
+
+      // Built-in branding signature (no QR yet)
+      let sigOff = String(req.body.signature_off || "").trim() === "1";
+      const sigText1 = (req.body.signature_text1 || "© Cheri Bayou Finds").toString().trim();
+      const sigText2 = (req.body.signature_text2 || "bayoufinds.com").toString().trim();
 
       const stamp = tsStamp();
       const zipName = `bayou-social-pack_${stamp}.zip`;
@@ -248,19 +391,16 @@ app.post(
       archive.pipe(res);
 
       // Render each output and add to zip
-      const jobs = [
-        ["facebook_1200x630.jpg",    SIZES.facebook_feed],
-        ["facebook_1080x1080.jpg",   SIZES.facebook_square],
-        ["instagram_1080x1080.jpg",  SIZES.instagram_square],
-        ["instagram_story_1080x1920.jpg", SIZES.instagram_story],
-        ["pinterest_1000x1500.jpg",  SIZES.pinterest],
-        ["youtube_1280x720.jpg",     SIZES.youtube_thumb],
-      ];
+      const profileKey = getProfileKey(req.body);
+      const jobs = PROFILES[profileKey];
 
       for (const [name, dim] of jobs) {
+                const baseImageBuf = safeCrop
+          ? await sharp(image.buffer).resize(dim.w, dim.h, { fit: "cover", position: "centre" }).jpeg({ quality: 92 }).toBuffer()
+          : image.buffer;
         const buf = await renderOne({
-          imageBuf: image.buffer,
-          logoBuf: logo.buffer,
+          imageBuf: baseImageBuf,
+          logoBuf: logoBuf,
           outW: dim.w,
           outH: dim.h,
           position,
@@ -268,10 +408,43 @@ app.post(
           opacity,
           margin,
         });
-        archive.append(buf, { name });
+        let outBuf = buf;
+        if (!sigOff) {
+          const sigSvg = makeGoldSignatureSvg({ w: dim.w, h: dim.h, text1: sigText1, text2: sigText2 });
+          outBuf = await sharp(buf)
+            .composite([{ input: sigSvg, top: 0, left: 0 }])
+            .jpeg({ quality: 92 })
+            .toBuffer();
+        }
+        archive.append(outBuf, { name });
       }
 
-      await archive.finalize();
+            // ------------------------------------------------------
+      // Auto-Post Pack files (captions/seo/alt/license/readme/manifest)
+      // ------------------------------------------------------
+      const presetKey = (req.body.preset || "").toString().trim().toLowerCase();
+      const topic = (req.body.topic || "").toString().trim();
+      const brand = "BayouFinds.com";
+
+      const ap = buildAutoPostPack({ preset: presetKey, topic, brand });
+
+      const manifest = {
+        brand,
+        preset: presetKey || "wallpaper",
+        topic: topic || "",
+        generated_at: new Date().toISOString(),
+        outputs: jobs.map(j => j[0]),
+        watermark: { position, size: sizeKey, opacity: Number(opacity), margin: Number(margin) }
+      };
+
+      archive.append(Buffer.from(ap.captions + "\n", "utf8"), { name: "captions.txt" });
+      archive.append(Buffer.from(ap.seo + "\n", "utf8"), { name: "seo.txt" });
+      archive.append(Buffer.from(ap.alt + "\n", "utf8"), { name: "alt-text.txt" });
+      archive.append(Buffer.from(ap.license + "\n", "utf8"), { name: "license.txt" });
+      archive.append(Buffer.from(ap.readme + "\n", "utf8"), { name: "README.txt" });
+      archive.append(Buffer.from(JSON.stringify(manifest, null, 2) + "\n", "utf8"), { name: "manifest.json" });
+
+await archive.finalize();
     } catch (e) {
       console.error("GENERATE ERROR:", e);
       res.status(500).json({ error: "ZIP generation failed." });

@@ -175,3 +175,20 @@ button:disabled{opacity:.55;cursor:not-allowed;filter:none}
   .grid{grid-template-columns:1fr}
   .hero{flex-direction:column;align-items:flex-start;gap:10px}
 }
+
+/* ------------------------------------------------------
+   Bayou Social Pack — Polish Pass (Focus + spacing)
+   ------------------------------------------------------ */
+.card {
+  transition: box-shadow 180ms ease, transform 180ms ease, border-color 180ms ease;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.card:focus-within {
+  box-shadow: 0 12px 28px rgba(0,0,0,0.35);
+  border-color: rgba(255,255,255,0.12);
+  transform: translateY(-1px);
+}
+
+.field { margin-bottom: 14px; }
+.row { gap: 14px; }

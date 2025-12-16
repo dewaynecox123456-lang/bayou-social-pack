@@ -4,29 +4,62 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Bayou Social Pack</title>
-  <link rel="stylesheet" href="/public/style.css" />
+  <link rel="stylesheet" href="/style.css" />
 </head>
+
 <body>
   <div class="wrap">
     <header class="hero">
       <div class="brand">
         <div class="mark">
-          <span class="pelican">🦢</span>
+          <span class="pelican" aria-label="BayouFinds">BF</span>
           <span class="name">Bayou Social Pack</span>
         </div>
-        <div class="sub">One upload → post-ready assets (Facebook-first).</div>
+        <div class="pill">BayouFinds – Creator Tools</div>
       </div>
-      <div class="pill">BayouFinds • Creator Tools</div>
     </header>
 
     <main class="grid">
       <section class="card">
         <h2>Generate a ZIP</h2>
+
+        <div style="display:flex; gap:12px; flex-wrap:wrap; margin: 10px 0 14px 0;">
+          <label style="flex:1; min-width:220px;">
+            <div style="opacity:.9; margin-bottom:6px;">Preset</div>
+            <select name="preset" id="bsp-preset" style="width:100%; padding:10px 12px; border-radius:12px;">
+              <option value="">Custom (manual)</option>
+              <option value="wallpaper">Wallpaper</option>
+              <option value="recipe">Recipe Promo</option>
+              <option value="product">Product Drop</option>
+              <option value="holiday">Holiday / Seasonal</option>
+            </select>
+            <div id="bsp-preset-note" style="opacity:.7; font-size:.9rem; margin-top:6px;">
+              Tip: Presets set size/opacity/margin automatically. You can still override manually.
+            </div>
+          </label>
+
+          <label style="flex:1; min-width:220px; display:flex; align-items:flex-end;">
+            <div style="width:100%; padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12);">
+              <label style="display:flex; gap:10px; align-items:center; cursor:pointer;">
+                <input type="checkbox" id="bsp-safe-crop" name="safe_crop" value="1" checked />
+                <div>
+                  <div style="font-weight:600;">Facebook-safe crop</div>
+                  <div style="opacity:.75; font-size:.9rem;">Keeps framing consistent (recommended).</div>
+                </div>
+              </label>
+            </div>
+          </label>
+        </div>
+
         <p class="muted">Upload one image + your logo. Preview is Facebook 1200×630.</p>
 
         <form id="frm">
           <label>Image (PNG/JPG)
             <input id="imageInput" type="file" name="image" accept="image/png,image/jpeg" required />
+
+            <div id="img-warn" style="display:none; margin-top:10px; padding:10px 12px; border-radius:12px; border:1px solid rgba(255,166,0,0.35); background: rgba(255,166,0,0.08); color:#ffd7a0; font-size:0.95rem;">
+              <strong>Heads up:</strong> <span id="img-warn-text"></span>
+            </div>
           </label>
 
           <label>Logo (PNG recommended)
@@ -45,6 +78,14 @@
                 <option value="center">Center</option>
               </select>
             </label>
+
+            <div class="field">
+              <label for="profile">Output profile</label>
+              <select id="profile" name="profile">
+                <option value="social" selected>Social Pack (FB/IG/PIN/YT)</option>
+                <option value="puzzle">Puzzle Print (2514×3567)</option>
+              </select>
+            </div>
 
             <label>Logo size
               <select name="size">
@@ -79,31 +120,38 @@
 
       <section class="card">
         <h2>Preview</h2>
-        <p class="muted">Facebook feed preview (1200×630). No zip download needed.</p>
+        <p class="muted">This is a quick render using your current settings.</p>
 
-        <div class="previewBox" id="previewBox" data-state="idle">
-          <div class="previewPlaceholder" id="previewPlaceholder">
-            <img
-              class="previewLogo"
-              src="/assets/overlays/bayoufinds-signature.svg"
-              alt="BayouFinds signature"
-              onerror="this.style.display='none'"
-            />
-            <div class="previewTitle" id="previewTitle">Preview will appear here</div>
-            <div class="previewHint" id="previewHint">Drop an image + logo, then click Preview.</div>
-            <div class="spinner" id="spinner" aria-hidden="true"></div>
+        <div class="previewShell">
+          <div class="previewMeta">
+            <div class="muted">Output</div>
+            <div id="previewLabel" style="font-weight:600;">Facebook 1200×630</div>
           </div>
 
-          <img id="previewImg" alt="Facebook feed preview (1200×630)" />
+          <div class="previewArea">
+            <img id="previewImg" alt="Preview" style="max-width:100%; border-radius:14px; display:none;" />
+            <div id="previewEmpty" class="muted" style="padding:18px; border:1px dashed rgba(255,255,255,0.18); border-radius:14px;">
+              No preview yet. Upload an image + logo, then click Preview.
+            </div>
+          </div>
         </div>
       </section>
     </main>
 
     <footer class="foot">
-      Powered by BayouFinds • <span class="muted">Phase 1 shipping build</span>
+      <div class="muted">© <span id="year"></span> BayouFinds.com</div>
     </footer>
   </div>
 
-  <script src="/public/app.js"></script>
+  <script>
+    // Tiny footer year helper (safe, no dependencies)
+    (function () {
+      const y = document.getElementById('year');
+      if (y) y.textContent = String(new Date().getFullYear());
+    })();
+  </script>
+
+  <!-- Your existing app logic -->
+  <script src="/app.js"></script>
 </body>
 </html>
