@@ -1,0 +1,26 @@
+{
+  "wallpaper": {
+    "size": "large",
+    "opacity": 0.85,
+    "margin": 32,
+    "signature_off": false
+  },
+  "recipe": {
+    "size": "medium",
+    "opacity": 0.90,
+    "margin": 28,
+    "signature_off": false
+  },
+  "product": {
+    "size": "medium",
+    "opacity": 0.92,
+    "margin": 28,
+    "signature_off": false
+  },
+  "holiday": {
+    "size": "large",
+    "opacity": 0.90,
+    "margin": 32,
+    "signature_off": false
+  }
+}
