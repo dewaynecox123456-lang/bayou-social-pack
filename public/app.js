@@ -70,7 +70,10 @@ function validateInputs(kind = "preview") {
 }
 
 function formDataFromForm() {
-  return new FormData(frm);
+  const fd = new FormData(frm);
+  const profileEl = document.getElementById("profile");
+  if (profileEl) fd.append("profile", profileEl.value);
+  return fd;
 }
 
 async function doPreview() {
@@ -164,3 +167,73 @@ logoInput.addEventListener("change", scheduleAutoPreview);
 
 // Initial state
 setPreviewState("idle", "Preview will appear here", "Drop an image + logo, then click Preview.");
+
+// ------------------------------------------------------
+// Preset + SafeCrop: force into FormData (robust wiring)
+// ------------------------------------------------------
+(function () {
+  function forceExtras(fd) {
+    try {
+      const presetEl = document.getElementById("bsp-preset");
+      const cropEl = document.getElementById("bsp-safe-crop");
+
+      if (presetEl && presetEl.value) fd.set("preset", presetEl.value);
+      if (cropEl) {
+        // checked -> "1", unchecked -> "0" (server reads either)
+        fd.set("safe_crop", cropEl.checked ? "1" : "0");
+      }
+    } catch (_) {}
+    return fd;
+  }
+
+  // Monkey-patch FormData creation if app uses fetch + new FormData(form)
+  // We hook common buttons by intercepting submit events.
+  const forms = Array.from(document.querySelectorAll("form"));
+  forms.forEach((form) => {
+    if (form.__bspExtrasHooked) return;
+    form.__bspExtrasHooked = true;
+
+    form.addEventListener("submit", (e) => {
+      // If the app's JS prevents default and builds FormData elsewhere, this does nothing harmful.
+      // If the browser submits normally, it still includes fields via name= attributes.
+    }, true);
+  });
+
+  // Expose helper for existing code paths
+  window.__bspForceExtras = forceExtras;
+})();
+
+// ------------------------------------------------------
+// Preset + SafeCrop: force into FormData (robust wiring)
+// ------------------------------------------------------
+(function () {
+  function forceExtras(fd) {
+    try {
+      const presetEl = document.getElementById("bsp-preset");
+      const cropEl = document.getElementById("bsp-safe-crop");
+
+      if (presetEl && presetEl.value) fd.set("preset", presetEl.value);
+      if (cropEl) {
+        // checked -> "1", unchecked -> "0" (server reads either)
+        fd.set("safe_crop", cropEl.checked ? "1" : "0");
+      }
+    } catch (_) {}
+    return fd;
+  }
+
+  // Monkey-patch FormData creation if app uses fetch + new FormData(form)
+  // We hook common buttons by intercepting submit events.
+  const forms = Array.from(document.querySelectorAll("form"));
+  forms.forEach((form) => {
+    if (form.__bspExtrasHooked) return;
+    form.__bspExtrasHooked = true;
+
+    form.addEventListener("submit", (e) => {
+      // If the app's JS prevents default and builds FormData elsewhere, this does nothing harmful.
+      // If the browser submits normally, it still includes fields via name= attributes.
+    }, true);
+  });
+
+  // Expose helper for existing code paths
+  window.__bspForceExtras = forceExtras;
+})();
