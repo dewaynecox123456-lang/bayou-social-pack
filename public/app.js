@@ -1,3 +1,55 @@
+
+function appendContext(fd) {
+  // ---- Context metadata (Option 1) ----
+  const t = document.getElementById("meta-title")?.value?.trim() || "";
+  const d = document.getElementById("meta-desc")?.value?.trim() || "";
+  const k = document.getElementById("meta-keywords")?.value?.trim() || "";
+  const l = document.getElementById("meta-location")?.value?.trim() || "";
+  if (t) fd.append("meta_title", t);
+  if (d) fd.append("meta_desc", d);
+  if (k) fd.append("meta_keywords", k);
+  if (l) fd.append("meta_location", l);
+}
+
+const COPY = {
+  headerTitle: "Bayou Social Pack",
+  headerSubtitle: "Create clean, ready-to-post social image packs.",
+
+  idleStatus: "",
+  idleTitle: "Upload an image to create your social pack.",
+  idleHint: "We’ll handle sizing, branding, and export.",
+
+  // Validation / requirements (kept short + pro)
+  needImageStatus: "Please upload an image.",
+  needImageTitle: "Upload an image to create your social pack.",
+  needImageHint: "JPG or PNG recommended",
+
+  needLogoStatus: "Please upload a logo.",
+  needLogoTitle: "Add your logo to continue.",
+  needLogoHint: "PNG recommended",
+
+  badImageTypeStatus: "Unsupported image type. Use PNG or JPG.",
+  badLogoTypeStatus: "Logo must be PNG.",
+
+  processingStatus: "Creating your social pack…",
+  processingTitle: "Creating your social pack…",
+  processingHint: "Preparing platform sizes, applying clean branding, and packaging files.",
+
+  previewIdleTitle: "Preview will appear here",
+  previewIdleHint: "Upload an image and logo to continue.",
+
+  successZipStatus: "Your social pack is ready.",
+  successZipTitle: "Your social pack is ready.",
+  successZipHint: "Download includes multiple platform-ready images in a clean ZIP.",
+
+  // Buttons (only used if you want to set them; safe to ignore)
+  btnPreview: "Preview",
+  btnZip: "Download Social Pack",
+
+  footer1: "Built by BayouFinds",
+  footer2: "bayoufinds.com",
+};
+
 const frm = document.getElementById("frm");
 const statusEl = document.getElementById("status");
 const previewImg = document.getElementById("previewImg");
@@ -25,11 +77,14 @@ function setBusy(on) {
   btnZip.disabled = busy;
 }
 
-function setPreviewState(state, title, hint) {
-  previewBox.dataset.state = state;
-  if (title) previewTitle.textContent = title;
-  if (hint) previewHint.textContent = hint;
-}
+function setPreviewState(state) {
+  const el = document.querySelector("[data-preview-state]");
+  if (!el) {
+    console.warn("[Preview] data-preview-state element not found. State:", state);
+    return;
+  }
+  if (!el) { console.warn("[UI] Missing preview state element [data-preview-state]"); return; }
+  el.dataset.state = state;}
 
 function revokePreviewUrl() {
   if (lastObjectUrl) {
@@ -43,13 +98,13 @@ function validateInputs(kind = "preview") {
   const logoOk = logoInput?.files?.length > 0;
 
   if (!imgOk) {
-    setStatus("Image required.");
-    setPreviewState("idle", "Preview will appear here", "Select an image (PNG/JPG) to continue.");
+    setStatus(COPY.needImageStatus);
+    setPreviewState("idle", COPY.needImageTitle, COPY.needImageHint);
     return false;
   }
   if (!logoOk) {
-    setStatus("Logo required.");
-    setPreviewState("idle", "Preview will appear here", "Select a logo (PNG) to continue.");
+    setStatus(COPY.needLogoStatus);
+    setPreviewState("idle", COPY.needLogoTitle, COPY.needLogoHint);
     return false;
   }
 
@@ -58,11 +113,11 @@ function validateInputs(kind = "preview") {
   const logoType = logoInput.files[0]?.type || "";
 
   if (!["image/png", "image/jpeg"].includes(imgType)) {
-    setStatus("Unsupported image type. Use PNG or JPG.");
+    setStatus(COPY.badImageTypeStatus);
     return false;
   }
   if (logoType !== "image/png") {
-    setStatus("Logo must be PNG.");
+    setStatus(COPY.badLogoTypeStatus);
     return false;
   }
 
@@ -71,7 +126,8 @@ function validateInputs(kind = "preview") {
 
 function formDataFromForm() {
   const fd = new FormData(frm);
-  const profileEl = document.getElementById("profile");
+  appendContext(fd);
+const profileEl = document.getElementById("profile");
   if (profileEl) fd.append("profile", profileEl.value);
   return fd;
 }
@@ -120,7 +176,7 @@ frm.addEventListener("submit", async (ev) => {
   setBusy(true);
   try {
     setStatus("Building ZIP…");
-    setPreviewState(previewBox.dataset.state || "idle", "Building ZIP…", "Packaging post-ready assets…");
+    setPreviewState((previewBox && previewBox.dataset && previewBox.dataset.state) ? previewBox.dataset.state : "idle", "Building ZIP…", "Packaging post-ready assets…");
 
     const fd = formDataFromForm();
     const r = await fetch("/api/generate", { method: "POST", body: fd });

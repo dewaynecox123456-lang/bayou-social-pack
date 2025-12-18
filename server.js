@@ -38,6 +38,18 @@ const PRINT_SIZES = {
   puzzle_8p38x11p89_300dpi: { w: 2514, h: 3567 },
 };
 
+
+// -------- Presets (size/opacity/margin/signature defaults) --------
+// NOTE: Keep keys lowercase. UI can request via body.preset or body.preset_key.
+const PRESETS = {
+  "custom (manual)": null,
+
+  // Good defaults for “signature at bottom” watermark style
+  "holiday / seasonal": { sizeKey: "small", opacity: 0.85, margin: 24, sigOff: true },
+  "brand-safe":         { sizeKey: "small", opacity: 0.80, margin: 28, sigOff: true },
+  "bold watermark":     { sizeKey: "medium", opacity: 0.90, margin: 18, sigOff: true },
+};
+
 const PROFILES = {
   social: [
     ["facebook_1200x630.jpg",         SIZES.facebook_feed],
@@ -136,6 +148,20 @@ function makeGoldSignatureSvg({ w, h, text1, text2 }) {
   );
 }
 function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+
+function applyPreset(body, state) {
+  const preset = String(body.preset || body.preset_key || "").trim().toLowerCase();
+  const p = (typeof PRESETS !== "undefined" && PRESETS) ? (PRESETS[preset] || null) : null;
+  if (!p) return state;
+
+  const out = { ...state };
+  if (p.sizeKey != null) out.sizeKey = p.sizeKey;
+  if (p.opacity != null) out.opacity = p.opacity;
+  if (p.margin != null) out.margin = p.margin;
+  if (p.sigOff != null) out.sigOff = boolish(p.sigOff, out.sigOff);
+  return out;
+}
+
 
 function sizePercent(sizeKey) {
   // percent of base width used for overlay width
@@ -295,6 +321,11 @@ app.get("/", (req, res) => {
 
 app.get("/health", (req, res) => res.json({ ok: true }));
 
+app.get("/api/presets", (req, res) => {
+  const keys = Object.keys(PRESETS).filter(k => PRESETS[k] !== null);
+  res.json({ presets: keys });
+});
+
 // -------- Preview (Phase 1) --------
 // returns ONE PNG preview: Facebook 1200x630
 app.post(
@@ -316,7 +347,8 @@ app.post(
       const logoBuf = (logo && logo.buffer) ? logo.buffer : EMPTY_PNG;
 
       // Built-in branding signature (no QR yet)
-      let sigOff = String(req.body.signature_off || "").trim() === "1";
+      let sigOff = true; // default OFF in Phase 1 (only uploaded logo shows)
+      // If you add a UI toggle later, map it to signature_force=1
       const sigText1 = (req.body.signature_text1 || "© Cheri Bayou Finds").toString().trim();
       const sigText2 = (req.body.signature_text2 || "bayoufinds.com").toString().trim();
 

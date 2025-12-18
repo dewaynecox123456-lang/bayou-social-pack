@@ -41,3 +41,42 @@ input, select, textarea {
 .brand{display:flex;align-items:center;gap:14px}
 .brand-img{height:46px;width:auto;display:block}
 .sub{color:var(--muted);font-size:13px;margin-top:4px}
+
+/* ----------------------------------------------------
+   Bayou Social Pack — Nav contrast patch (accessibility)
+   Goal: make purple links readable on dark header
+---------------------------------------------------- */
+
+:root{
+  --bf-accent: #CBB6FF;        /* brighter lavender */
+  --bf-accent-strong: #F0E9FF; /* hover bright */
+  --bf-accent-border: rgba(203,182,255,0.35);
+  --bf-accent-glow: rgba(203,182,255,0.25);
+}
+
+/* Top navigation links */
+.topnav a,
+.topnav__links a {
+  color: var(--bf-accent) !important;
+  text-shadow: 0 0 10px var(--bf-accent-glow);
+  border-color: var(--bf-accent-border) !important;
+}
+
+/* Hover / focus (keyboard friendly) */
+.topnav a:hover,
+.topnav__links a:hover,
+.topnav a:focus-visible,
+.topnav__links a:focus-visible {
+  color: var(--bf-accent-strong) !important;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(203,182,255,0.18);
+  border-color: rgba(240,233,255,0.55) !important;
+}
+
+/* Optional: pill buttons if those are the hard-to-see ones */
+.pill, .chip, .badge {
+  color: var(--bf-accent) !important;
+  border-color: var(--bf-accent-border) !important;
+  text-shadow: 0 0 10px var(--bf-accent-glow);
+}
+

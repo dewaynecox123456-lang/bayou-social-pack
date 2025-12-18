@@ -8,6 +8,23 @@
 </head>
 
 <body>
+
+  <!-- Top Nav (single-page anchors) -->
+  <header id="topnav" class="topnav">
+    <div class="topnav__brand">
+      <div class="topnav__title">Bayou Social Pack</div>
+      <div class="topnav__sub">Create clean, ready-to-post social image packs.</div>
+    </div>
+    <nav class="topnav__links" aria-label="Primary">
+      <a href="#tool">Tool</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+      <a href="#contact">Contact</a>
+    </nav>
+  </header>
+
+  <main id="tool" class="page">
+
   <div class="wrap">
     <header class="hero">
       <div class="brand">
@@ -110,7 +127,39 @@
           </div>
 
           <div class="btnrow">
-            <button type="button" id="btnPreview">Preview (Facebook)</button>
+            
+          <!-- ---------- Context (Option 1: Context-in, Metadata-out) ---------- -->
+          <div class="card" style="margin-top:14px;">
+            <div class="label" style="margin-bottom:8px;">Context (used for ALT/SEO/Captions)</div>
+
+            <label class="label" for="meta-title">Title</label>
+            <input id="meta-title" name="meta_title" class="input" type="text"
+                   placeholder="e.g., Fontainebleau Sunrise Reflections" />
+
+            <div style="height:10px;"></div>
+
+            <label class="label" for="meta-desc">Description</label>
+            <textarea id="meta-desc" name="meta_desc" class="input" rows="3"
+                      placeholder="1–2 sentences. What’s in the scene? What’s the vibe?"></textarea>
+
+            <div style="height:10px;"></div>
+
+            <label class="label" for="meta-keywords">Keywords (comma-separated)</label>
+            <input id="meta-keywords" name="meta_keywords" class="input" type="text"
+                   placeholder="bayou finds, louisiana, reflections, cozy aesthetic, wallpaper" />
+
+            <div style="height:10px;"></div>
+
+            <label class="label" for="meta-location">Location (optional)</label>
+            <input id="meta-location" name="meta_location" class="input" type="text"
+                   placeholder="e.g., Fontainebleau State Park, Louisiana" />
+
+            <div class="hint" style="margin-top:10px; opacity:.9;">
+              Tip: Fill this once per image. Your ZIP will include correct ALT + SEO + captions automatically.
+            </div>
+          </div>
+
+<button type="button" id="btnPreview">Preview (Facebook)</button>
             <button type="submit" id="btnZip">Generate ZIP</button>
           </div>
 
@@ -153,5 +202,45 @@
 
   <!-- Your existing app logic -->
   <script src="/app.js"></script>
+  </main>
+
+  
+  <section id="pricing" class="page page--alt">
+    <h2>Pricing</h2>
+    <p><strong>Early Access</strong></p>
+    <p class="price">$9 <span class="muted">— one-time</span></p>
+    <ul class="pricing-list">
+      <li>Instant ZIP download</li>
+      <li>Multiple platform-ready image sizes</li>
+      <li>Clean folder + filename structure</li>
+      <li>Commercial-safe output</li>
+      <li>No subscriptions. No credits.</li>
+    </ul>
+    <p class="muted">Early Access pricing ends when v1 ships.</p>
+  </section>
+
+
+  <section id="faq" class="page">
+    <h2>FAQ</h2>
+    <details>
+      <summary>What do I get?</summary>
+      <p>A clean ZIP with multiple platform-ready image sizes, organized and ready to post.</p>
+    </details>
+    <details>
+      <summary>Do I keep my files?</summary>
+      <p>Yes. You download your pack and keep the output.</p>
+    </details>
+    <details>
+      <summary>Do you store my images?</summary>
+      <p>Standard workflow: files are processed to generate outputs. If you want a strict “no retention” mode, we can add it in v1.</p>
+    </details>
+  </section>
+
+  <section id="contact" class="page page--alt">
+    <h2>Contact</h2>
+    <p>Questions or issues? Reach out via BayouFinds.</p>
+    <p class="muted">Built by BayouFinds • bayoufinds.com</p>
+  </section>
+
 </body>
 </html>
