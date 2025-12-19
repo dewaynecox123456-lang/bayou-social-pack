@@ -19,7 +19,7 @@
       <a href="#tool">Tool</a>
       <a href="#pricing">Pricing</a>
       <a href="#faq">FAQ</a>
-      <a href="#contact">Contact</a>
+      <a href="https://bayoufinds.com/contact" target="_blank" rel="noopener">Contact</a>
     </nav>
   </header>
 
@@ -39,6 +39,50 @@
     <main class="grid">
       <section class="card">
         <h2>Generate a ZIP</h2>
+        <hr style="margin:18px 0; opacity:.35;" />
+
+        <h2>Generate a Post</h2>
+        <p class="muted">Zero-cost offline copy engine. Generates post text, hashtags, and ALT text.</p>
+
+        <form id="copyForm" class="form">
+          <div class="grid2">
+            <label>
+              Platform
+              <select id="copyPlatform">
+                <option value="facebook" selected>Facebook</option>
+                <option value="linkedin">LinkedIn</option>
+              </select>
+            </label>
+
+            <label>
+              Link (include once)
+              <input id="copyLink" type="url" value="https://bayoufinds.com" />
+            </label>
+          </div>
+
+          <label>
+            Context (what is the image/post about?)
+            <textarea id="copyContext" rows="3" placeholder="e.g., Bayou Social Pack teaser image — one-click image pack generator"></textarea>
+          </label>
+
+          <label>
+            Tags (comma separated)
+            <input id="copyTags" type="text" value="bayoufinds, creator-tools, louisiana, smallbusiness" />
+          </label>
+
+          <div class="grid2" style="align-items:end;">
+            <button type="submit" id="btnCopyGen">Generate Post</button>
+            <button type="button" id="btnCopyClip" disabled>Copy to Clipboard</button>
+          </div>
+
+          <label>
+            Output
+            <textarea id="copyOut" rows="8" readonly placeholder="Your generated post will appear here…"></textarea>
+          </label>
+
+          <div class="muted" id="copyMeta"></div>
+        </form>
+
 
         <div style="display:flex; gap:12px; flex-wrap:wrap; margin: 10px 0 14px 0;">
           <label style="flex:1; min-width:220px;">

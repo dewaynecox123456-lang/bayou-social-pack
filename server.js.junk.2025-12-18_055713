@@ -7,7 +7,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 import fs from "fs";
-import registerCopyRoutes from "./routes/copy.mjs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
@@ -17,9 +16,6 @@ const app = express();
 app.use(express.static(path.join(__dirname, "public")));
 
 app.use(cors());
-
-app.use(express.json({ limit: "2mb" }));
-registerCopyRoutes(app);
 
 // -------- Config --------
 const PORT = process.env.PORT || 8787;
@@ -40,6 +36,18 @@ const SIZES = {
 const PRINT_SIZES = {
   // 8.38" x 11.89" @ 300 DPI (print-ready)
   puzzle_8p38x11p89_300dpi: { w: 2514, h: 3567 },
+};
+
+
+// -------- Presets (size/opacity/margin/signature defaults) --------
+// NOTE: Keep keys lowercase. UI can request via body.preset or body.preset_key.
+const PRESETS = {
+  "custom (manual)": null,
+
+  // Good defaults for “signature at bottom” watermark style
+  "holiday / seasonal": { sizeKey: "small", opacity: 0.85, margin: 24, sigOff: true },
+  "brand-safe":         { sizeKey: "small", opacity: 0.80, margin: 28, sigOff: true },
+  "bold watermark":     { sizeKey: "medium", opacity: 0.90, margin: 18, sigOff: true },
 };
 
 const PROFILES = {
@@ -71,7 +79,7 @@ function requireLicense(req, res, next) {
   const expected = process.env.BSP_LICENSE_KEY;
   if (!expected) {
     // If you haven't set it yet, keep server usable but visible
-    return res.status(200).json({ ok: false, mode: "free", error: "ZIP generation is disabled in Free Mode (BSP_LICENSE_KEY missing).", hint: "This is expected. Use Generate a Post for captions/hashtags/ALT at no cost." });
+    return res.status(503).json({ error: "Server not configured: BSP_LICENSE_KEY missing." });
   }
   const got = req.header("x-bsp-key") || "";
   if (got !== expected) return res.status(401).json({ error: "Invalid license key." });
@@ -140,6 +148,20 @@ function makeGoldSignatureSvg({ w, h, text1, text2 }) {
   );
 }
 function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+
+function applyPreset(body, state) {
+  const preset = String(body.preset || body.preset_key || "").trim().toLowerCase();
+  const p = (typeof PRESETS !== "undefined" && PRESETS) ? (PRESETS[preset] || null) : null;
+  if (!p) return state;
+
+  const out = { ...state };
+  if (p.sizeKey != null) out.sizeKey = p.sizeKey;
+  if (p.opacity != null) out.opacity = p.opacity;
+  if (p.margin != null) out.margin = p.margin;
+  if (p.sigOff != null) out.sigOff = boolish(p.sigOff, out.sigOff);
+  return out;
+}
+
 
 function sizePercent(sizeKey) {
   // percent of base width used for overlay width
@@ -299,12 +321,74 @@ app.get("/", (req, res) => {
 
 app.get("/health", (req, res) => res.json({ ok: true }));
 
+app.get("/api/presets", (req, res) => {
+  const keys = Object.keys(PRESETS).filter(k => PRESETS[k] !== null);
+  res.json({ presets: keys });
+});
+
 // -------- Preview (Phase 1) --------
 // returns ONE PNG preview: Facebook 1200x630
-/* PREVIEW DISABLED (ZIP-only mode)
-/* /api/preview removed (ZIP-only mode). Preview was causing instability. */
+app.post(
+  "/api/preview",
+  requireLicense,
+  upload.fields([{ name: "image" }, { name: "logo" }]),
+  async (req, res) => {
+    try {
+      const image = req.files?.image?.[0];
+      const logo  = req.files?.logo?.[0];
+      if (!image) return res.status(400).json({ error: "Missing image upload." });
+
+      const position = req.body.position || DEFAULTS.position;
+      let sizeKey  = req.body.size || DEFAULTS.size;
+      let opacity  = clamp(parseFloat(req.body.opacity ?? DEFAULTS.opacity), 0.1, 1.0);
+      let margin   = clamp(parseInt(req.body.margin ?? DEFAULTS.margin, 10), 0, 200);
+      const safeCrop = String(req.body.safe_crop || "").trim().toLowerCase() === "1" || String(req.body.safe_crop || "").trim().toLowerCase() === "on";
+      // Logo optional: fall back to transparent PNG
+      const logoBuf = (logo && logo.buffer) ? logo.buffer : EMPTY_PNG;
+
+      // Built-in branding signature (no QR yet)
+      let sigOff = true; // default OFF in Phase 1 (only uploaded logo shows)
+      // If you add a UI toggle later, map it to signature_force=1
+      const sigText1 = (req.body.signature_text1 || "© Cheri Bayou Finds").toString().trim();
+      const sigText2 = (req.body.signature_text2 || "bayoufinds.com").toString().trim();
 
 
+      // Apply preset overrides (size/opacity/margin/signature_off)
+      ({ sizeKey, opacity, margin, sigOff } = applyPreset(req.body, { sizeKey, opacity, margin, sigOff }));
+      const profileKey = getProfileKey(req.body);
+      const first = PROFILES[profileKey][0];
+      const dim = first[1];
+      const { w, h } = dim;
+
+      const baseImageBuf = safeCrop
+        ? await sharp(image.buffer).resize(w, h, { fit: "cover", position: "centre" }).jpeg({ quality: 92 }).toBuffer()
+        : image.buffer;
+
+      // Render output JPG, then convert to PNG for easy browser preview
+      const jpg = await renderOne({
+        imageBuf: baseImageBuf,
+        logoBuf: logoBuf,
+        outW: w,
+        outH: h,
+        position,
+        sizeKey,
+        opacity,
+        margin,
+      });
+
+      const png = await sharp(jpg).png().toBuffer();
+
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Cache-Control", "no-store");
+      res.send(png);
+    } catch (e) {
+      console.error("PREVIEW ERROR:", e);
+      res.status(500).json({ error: "Preview failed." });
+    }
+  }
+);
+
+// -------- Generate ZIP (Phase 1) --------
 app.post(
   "/api/generate",
   requireLicense,
@@ -319,10 +403,14 @@ app.post(
       let sizeKey  = req.body.size || DEFAULTS.size;
       let opacity  = clamp(parseFloat(req.body.opacity ?? DEFAULTS.opacity), 0.1, 1.0);
       let margin   = clamp(parseInt(req.body.margin ?? DEFAULTS.margin, 10), 0, 200);
-      const safeCrop = ["1","on","true","yes"].includes(String(req.body.safe_crop || "").trim().toLowerCase());
-
-      // ZIP-only mode: ONLY apply uploaded logo; NO built-in signature; NO extra metadata files
+      const safeCrop = String(req.body.safe_crop || "").trim().toLowerCase() === "1" || String(req.body.safe_crop || "").trim().toLowerCase() === "on";
+      // Logo optional: fall back to transparent PNG
       const logoBuf = (logo && logo.buffer) ? logo.buffer : EMPTY_PNG;
+
+      // Built-in branding signature (no QR yet)
+      let sigOff = String(req.body.signature_off || "").trim() === "1";
+      const sigText1 = (req.body.signature_text1 || "© Cheri Bayou Finds").toString().trim();
+      const sigText2 = (req.body.signature_text2 || "bayoufinds.com").toString().trim();
 
       const stamp = tsStamp();
       const zipName = `bayou-social-pack_${stamp}.zip`;
@@ -334,18 +422,15 @@ app.post(
       archive.on("error", (err) => { throw err; });
       archive.pipe(res);
 
+      // Render each output and add to zip
       const profileKey = getProfileKey(req.body);
       const jobs = PROFILES[profileKey];
 
       for (const [name, dim] of jobs) {
-        const baseImageBuf = safeCrop
-          ? await sharp(image.buffer)
-              .resize(dim.w, dim.h, { fit: "cover", position: "centre" })
-              .jpeg({ quality: 92 })
-              .toBuffer()
+                const baseImageBuf = safeCrop
+          ? await sharp(image.buffer).resize(dim.w, dim.h, { fit: "cover", position: "centre" }).jpeg({ quality: 92 }).toBuffer()
           : image.buffer;
-
-        const outJpg = await renderOne({
+        const buf = await renderOne({
           imageBuf: baseImageBuf,
           logoBuf: logoBuf,
           outW: dim.w,
@@ -355,82 +440,49 @@ app.post(
           opacity,
           margin,
         });
-
-        archive.append(outJpg, { name: `${name}.jpg` });
+        let outBuf = buf;
+        if (!sigOff) {
+          const sigSvg = makeGoldSignatureSvg({ w: dim.w, h: dim.h, text1: sigText1, text2: sigText2 });
+          outBuf = await sharp(buf)
+            .composite([{ input: sigSvg, top: 0, left: 0 }])
+            .jpeg({ quality: 92 })
+            .toBuffer();
+        }
+        archive.append(outBuf, { name });
       }
 
-      await archive.finalize();
+            // ------------------------------------------------------
+      // Auto-Post Pack files (captions/seo/alt/license/readme/manifest)
+      // ------------------------------------------------------
+      const presetKey = (req.body.preset || "").toString().trim().toLowerCase();
+      const topic = (req.body.topic || "").toString().trim();
+      const brand = "BayouFinds.com";
+
+      const ap = buildAutoPostPack({ preset: presetKey, topic, brand });
+
+      const manifest = {
+        brand,
+        preset: presetKey || "wallpaper",
+        topic: topic || "",
+        generated_at: new Date().toISOString(),
+        outputs: jobs.map(j => j[0]),
+        watermark: { position, size: sizeKey, opacity: Number(opacity), margin: Number(margin) }
+      };
+
+      archive.append(Buffer.from(ap.captions + "\n", "utf8"), { name: "captions.txt" });
+      archive.append(Buffer.from(ap.seo + "\n", "utf8"), { name: "seo.txt" });
+      archive.append(Buffer.from(ap.alt + "\n", "utf8"), { name: "alt-text.txt" });
+      archive.append(Buffer.from(ap.license + "\n", "utf8"), { name: "license.txt" });
+      archive.append(Buffer.from(ap.readme + "\n", "utf8"), { name: "README.txt" });
+      archive.append(Buffer.from(JSON.stringify(manifest, null, 2) + "\n", "utf8"), { name: "manifest.json" });
+
+await archive.finalize();
     } catch (e) {
       console.error("GENERATE ERROR:", e);
-      // If headers already started streaming, we cannot send JSON safely.
-      if (!res.headersSent) res.status(500).json({ error: "ZIP generation failed." });
+      res.status(500).json({ error: "ZIP generation failed." });
     }
   }
 );
-
-
-// ------------------------------------------------------
-// Free Mode: placeholder preview + friendly generate response
-// ------------------------------------------------------
-const FREE_MODE_PLACEHOLDER_PNG = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO8p0l8AAAAASUVORK5CYII=",
-  "base64"
-);
-
-// Some older UI builds call GET /api/preview to render an image.
-// Return a tiny PNG so the UI doesn't 404 spam the console.
-
-// Allow POST for preview (frontend sends FormData)
-app.post("/api/preview", (req, res, next) => {
-  // Re-run the GET handler without duplicating code
-  req.method = "GET";
-  req.url = "/api/preview";
-  return app._router.handle(req, res, next);
-});
-
-app.get("/api/preview", (req, res) => {
-  res.setHeader("Content-Type", "image/png");
-  res.setHeader("Cache-Control", "no-store");
-  return res.status(200).send(FREE_MODE_PLACEHOLDER_PNG);
-});
-
-// Accept POST for preview (frontend sends FormData)
-app.post("/api/preview", (req, res) => {
-  req.method = "GET";
-  app._router.handle(req, res);
-});
-
-// Back-compat: older UI builds request /api/preview1
-app.get("/api/preview1", (req, res) => {
-  // Reuse the same handler via internal redirect
-  req.url = "/api/preview";
-  return app._router.handle(req, res, () => res.status(404).end());
-});
-
-
-// If the UI calls /api/preview/:variant, handle that too.
-app.get("/api/preview/:variant", (req, res) => {
-  res.setHeader("Content-Type", "image/png");
-  res.setHeader("Cache-Control", "no-store");
-  return res.status(200).send(FREE_MODE_PLACEHOLDER_PNG);
-});
-
-// If ZIP generation is gated (license missing), respond cleanly.
-// This prevents scary 503 errors while keeping the feature locked.
-app.post("/api/generate", async (req, res, next) => {
-  try {
-    if (!process.env.BSP_LICENSE_KEY) {
-      return res.status(200).json({
-        ok: false,
-        error: "ZIP generation is disabled in Free Mode (BSP_LICENSE_KEY missing).",
-        hint: "This is expected. Copy generator stays available with /api/copy."
-      });
-    }
-    return next();
-  } catch (e) {
-    return res.status(200).json({ ok: false, error: String(e) });
-  }
-});
 
 app.listen(PORT, () => {
   console.log(`Bayou Social Pack running -> http://localhost:${PORT}`);

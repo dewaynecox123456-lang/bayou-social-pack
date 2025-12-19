@@ -78,6 +78,9 @@ function setBusy(on) {
 }
 
 function setPreviewState(state) {
+  const previewBox = document.getElementById('previewBox') || document.querySelector('[data-preview-state]');
+  if (!previewBox) return;
+
   const el = document.querySelector("[data-preview-state]");
   if (!el) {
     console.warn("[Preview] data-preview-state element not found. State:", state);
@@ -169,6 +172,10 @@ async function doPreview() {
 btnPreview.addEventListener("click", doPreview);
 
 frm.addEventListener("submit", async (ev) => {
+// External links should not be hijacked by in-page tab scrolling
+  const a = (ev?.target && ev.target.closest) ? ev.target.closest("a") : null;
+  const href = a ? (a.getAttribute("href") || "") : "";
+  if (/^https?:\/\//i.test(href)) return; // let browser navigate
   ev.preventDefault();
   if (busy) return;
   if (!validateInputs("zip")) return;
@@ -181,7 +188,15 @@ frm.addEventListener("submit", async (ev) => {
     const fd = formDataFromForm();
     const r = await fetch("/api/generate", { method: "POST", body: fd });
 
-    if (!r.ok) {
+    
+  // Guard: only download if server returned a real ZIP
+  const ct = (r.headers.get("content-type") || "").toLowerCase();
+  if (!ct.includes("application/zip")) {
+    const j = await readErrorResponse(r);
+    const msg = j.error || j.message || `Generate failed (${r.status})`;
+    throw new Error(msg);
+  }
+if (!r.ok) {
       const j = await r.json().catch(() => ({}));
       throw new Error(j.error || `Generate failed (${r.status})`);
     }
@@ -293,3 +308,116 @@ setPreviewState("idle", "Preview will appear here", "Drop an image + logo, then 
   // Expose helper for existing code paths
   window.__bspForceExtras = forceExtras;
 })();
+
+
+// ------------------------------------------------------
+// Copy Generator (offline /api/copy)
+// ------------------------------------------------------
+function wireCopyGenerator() {
+  const form = document.getElementById("copyForm");
+  if (!form) return;
+
+  const platformEl = document.getElementById("copyPlatform");
+  const linkEl = document.getElementById("copyLink");
+  const contextEl = document.getElementById("copyContext");
+  const tagsEl = document.getElementById("copyTags");
+  const outEl = document.getElementById("copyOut");
+  const metaEl = document.getElementById("copyMeta");
+  const btnGen = document.getElementById("btnCopyGen");
+  const btnClip = document.getElementById("btnCopyClip");
+
+  function setMeta(msg) {
+    if (metaEl) metaEl.textContent = msg || "";
+  }
+
+  function parseTags(raw) {
+    return String(raw || "")
+      .split(",")
+      .map(s => s.trim())
+      .filter(Boolean);
+  }
+
+  form.addEventListener("submit", async (e) => {
+// External links should not be hijacked by in-page tab scrolling
+    const a = (e?.target && e.target.closest) ? e.target.closest("a") : null;
+    const href = a ? (a.getAttribute("href") || "") : "";
+    if (/^https?:\/\//i.test(href)) return; // let browser navigate
+    if ((link.href||"").startsWith("http")) return;
+    e.preventDefault();
+    btnGen.disabled = true;
+    btnClip.disabled = true;
+    setMeta("Generating…");
+
+    const payload = {
+      platform: (platformEl?.value || "facebook"),
+      link: (linkEl?.value || "https://bayoufinds.com"),
+      context: (contextEl?.value || ""),
+      tags: parseTags(tagsEl?.value || "")
+    };
+
+    try {
+      const r = await fetch("/api/copy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const j = await r.json();
+
+      if (!j || j.ok !== true) {
+        throw new Error(j?.error || `Copy failed (${r.status})`);
+      }
+
+      const hashtags = Array.isArray(j.hashtags) ? j.hashtags.join(" ") : "";
+      const lines = [
+        j.post || "",
+        "",
+        hashtags ? hashtags : "",
+        "",
+        j.alt_text ? `ALT: ${j.alt_text}` : "",
+        j.cta ? `CTA: ${j.cta}` : ""
+      ].filter(Boolean);
+
+      outEl.value = lines.join("\n");
+      btnClip.disabled = false;
+
+      setMeta(`Mode: ${j.mode || "offline"} • Platform: ${j.platform || payload.platform} • Hashtags: ${(j.hashtags||[]).length}`);
+    } catch (err) {
+      outEl.value = "";
+      setMeta(`Error: ${err?.message || err}`);
+      alert(err?.message || String(err));
+    } finally {
+      btnGen.disabled = false;
+    }
+  });
+
+  btnClip.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(outEl.value || "");
+      setMeta("Copied to clipboard ✅");
+    } catch {
+      // Fallback for older clipboard permissions
+      outEl.focus();
+      outEl.select();
+      document.execCommand("copy");
+      setMeta("Copied to clipboard ✅");
+    }
+  });
+}
+
+// Ensure wiring runs after DOM is ready
+document.addEventListener("DOMContentLoaded", () => {
+  wireCopyGenerator();
+});
+
+
+
+async function readErrorResponse(resp) {
+  const ct = (resp.headers.get("content-type") || "").toLowerCase();
+  try {
+    if (ct.includes("application/json")) return await resp.json();
+    return { error: await resp.text() };
+  } catch (e) {
+    return { error: `Failed to read error response: ${e}` };
+  }
+}

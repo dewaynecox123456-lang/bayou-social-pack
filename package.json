@@ -1,16 +1,9 @@
 {
   "name": "bayou-social-pack",
-  "version": "1.0.0",
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "node server.js"
-  },
-  "dependencies": {
-    "archiver": "^7.0.1",
-    "cors": "^2.8.5",
-    "express": "^4.19.2",
-    "multer": "^1.4.5-lts.1",
-    "sharp": "^0.34.1"
+    "start": "node server.js",
+    "dev": "nodemon --watch server.js --watch routes --watch public --ext js,mjs,html,css --signal SIGTERM server.js"
   }
 }
