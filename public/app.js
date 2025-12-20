@@ -158,6 +158,9 @@ async function doPreview() {
     const url = URL.createObjectURL(blob);
     lastObjectUrl = url;
     previewImg.src = url;
+    previewImg.style.display = "block";
+    const pb = document.getElementById("previewBox");
+    if (pb) pb.setAttribute("data-state","ready");
 
     setPreviewState("ready");
     setStatus("Preview ready.");

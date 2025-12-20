@@ -247,3 +247,14 @@ details summary{ cursor: pointer; }
 .pricing-list li {
   margin: 6px 0;
 }
+
+/* --- Preview hardening: ensure preview image is visible --- */
+#previewBox {
+  min-height: 220px;
+}
+
+#previewImg {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+}

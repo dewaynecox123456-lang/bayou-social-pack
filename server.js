@@ -372,113 +372,49 @@ app.post(
 // ------------------------------------------------------
 // Free Mode: placeholder preview + friendly generate response
 // ------------------------------------------------------
+
 const FREE_MODE_PLACEHOLDER_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO8p0l8AAAAASUVORK5CYII=",
   "base64"
 );
 
-// Some older UI builds call GET /api/preview to render an image.
-// Return a tiny PNG so the UI doesn't 404 spam the console.
-
-
-// ------------------------------------------------------
-// Real Preview (Free + Paid): render a single PNG from uploaded image/logo.
-// No license required. No OpenAI required. Zero cost.
-// Fields expected from UI FormData: image, logo (optional), variant (optional)
-// ------------------------------------------------------
-app.post("/api/preview", async (req, res) => {
-  try {
-    const { default: multer } = await import("multer");
-    const { default: sharp } = await import("sharp");
-
-    const upload = multer({
-      storage: multer.memoryStorage(),
-      limits: { fileSize: 15 * 1024 * 1024 } // 15MB
-    });
-
-    upload.fields([
-      { name: "image", maxCount: 1 },
-      { name: "logo",  maxCount: 1 },
-      { name: "watermark", maxCount: 1 }
-    ])(req, res, async (err) => {
-      if (err) return res.status(400).json({ ok: false, error: err.message });
-
-      const img = req.files?.image?.[0];
-      if (!img) {
-        res.setHeader("Content-Type", "image/png");
-        res.setHeader("Cache-Control", "no-store");
-        return res.status(200).send(FREE_MODE_PLACEHOLDER_PNG);
-      }
-
-      const variant = String(req.body?.variant || req.query?.variant || "facebook").toLowerCase();
-      const presets = {
-        facebook:  { w: 1200, h: 630 },
-        linkedin:  { w: 1200, h: 627 },
-        x:         { w: 1600, h: 900 },
-        instagram: { w: 1080, h: 1080 },
-        story:     { w: 1080, h: 1920 }
-      };
-      const { w, h } = presets[variant] || presets.facebook;
-
-      // Base image
-      let baseBuf = await sharp(img.buffer)
-        .resize(w, h, { fit: "cover", position: "centre" })
-        .png()
-        .toBuffer();
-
-      // Optional logo bottom-right
-      const logoFile = req.files?.logo?.[0] || req.files?.watermark?.[0];
-      if (logoFile) {
-        const pad = Math.round(Math.min(w, h) * 0.03);
-        const logoMaxW = Math.round(w * 0.22);
-        const logoMaxH = Math.round(h * 0.22);
-
-        const logoBuf = await sharp(logoFile.buffer)
-          .resize({ width: logoMaxW, height: logoMaxH, fit: "inside" })
-          .png()
-          .toBuffer();
-
-        const meta = await sharp(logoBuf).metadata();
-        const left = Math.max(pad, w - pad - Number(meta?.width || 0))
-        const top  = Math.max(pad, h - pad - Number(meta?.height || 0))
-
-        baseBuf = await sharp(baseBuf)
-          .composite([{ input: logoBuf, left: left, top: top }])
-          .png()
-          .toBuffer();
-      }
-
-      res.setHeader("Content-Type", "image/png");
-      res.setHeader("Cache-Control", "no-store");
-      return res.status(200).send(baseBuf);
-    });
-
-  } catch (e) {
-    return res.status(500).json({ ok: false, error: String(e?.message || e) });
-  }
+// UI sends POST /api/preview with FormData; route it to GET handler.
+app.post("/api/preview", (req, res, next) => {
+  req.method = "GET";
+  req.url = "/api/preview";
+  return app._router.handle(req, res, next);
 });
 
-
+// Preview endpoint: if a real preview was generated, serve it.
+// Otherwise fall back to the tiny placeholder.
 app.get("/api/preview", (req, res) => {
+  try {
+    const previewPath = "/tmp/bsp-preview.png";
+    if (fs.existsSync(previewPath)) {
+      const buf = fs.readFileSync(previewPath);
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(200).send(buf);
+    }
+  } catch (e) {
+    // fall through to placeholder
+  }
+
   res.setHeader("Content-Type", "image/png");
   res.setHeader("Cache-Control", "no-store");
   return res.status(200).send(FREE_MODE_PLACEHOLDER_PNG);
 });
 
-
 // Back-compat: older UI builds request /api/preview1
 app.get("/api/preview1", (req, res) => {
-  // Reuse the same handler via internal redirect
   req.url = "/api/preview";
   return app._router.handle(req, res, () => res.status(404).end());
 });
 
-
 // If the UI calls /api/preview/:variant, handle that too.
 app.get("/api/preview/:variant", (req, res) => {
-  res.setHeader("Content-Type", "image/png");
-  res.setHeader("Cache-Control", "no-store");
-  return res.status(200).send(FREE_MODE_PLACEHOLDER_PNG);
+  req.url = "/api/preview";
+  return app._router.handle(req, res, () => res.status(404).end());
 });
 
 // If ZIP generation is gated (license missing), respond cleanly.
